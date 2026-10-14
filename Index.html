@@ -1,1 +1,371 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Business Assistant</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #172033;
+}
+
+header {
+  background: #123c69;
+  color: white;
+  padding: 22px 16px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 23px;
+}
+
+header p {
+  margin-bottom: 0;
+  font-size: 14px;
+}
+
+main {
+  max-width: 800px;
+  margin: auto;
+  padding: 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card, .panel {
+  background: white;
+  padding: 17px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px #0000000a;
+}
+
+.card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.card h2 {
+  margin-bottom: 0;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+h3 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+input, select, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+input, select {
+  border: 1px solid #cbd5e1;
+  background: white;
+}
+
+button {
+  border: none;
+  background: #1769aa;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:active {
+  opacity: 0.8;
+}
+
+.danger {
+  background: #b42318;
+  width: auto;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.record {
+  border-top: 1px solid #e2e8f0;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.record strong {
+  display: block;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 13px;
+}
+
+#message {
+  color: #1769aa;
+  font-size: 14px;
+}
+
+@media (max-width: 350px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>AI Business Assistant</h1>
+  <p>Smart business management for everyone</p>
+</header>
+
+<main>
+
+  <section class="cards">
+    <div class="card">
+      <p>Total Sales</p>
+      <h2 id="salesTotal">₹0.00</h2>
+    </div>
+
+    <div class="card">
+      <p>Total Expenses</p>
+      <h2 id="expenseTotal">₹0.00</h2>
+    </div>
+
+    <div class="card">
+      <p>Sales - Expenses</p>
+      <h2 id="balanceTotal">₹0.00</h2>
+    </div>
+
+    <div class="card">
+      <p>Total Transactions</p>
+      <h2 id="transactionCount">0</h2>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Add Transaction</h3>
+
+    <form id="transactionForm">
+
+      <label for="type">Transaction Type</label>
+      <select id="type" required>
+        <option value="sale">Sale</option>
+        <option value="expense">Expense</option>
+      </select>
+
+      <label for="description">Description</label>
+      <input id="description"
+        type="text"
+        maxlength="100"
+        placeholder="Example: Grocery sales"
+        required>
+
+      <label for="amount">Amount (₹)</label>
+      <input id="amount"
+        type="number"
+        min="0.01"
+        max="100000000"
+        step="0.01"
+        placeholder="Enter amount"
+        required>
+
+      <button type="submit">Save Transaction</button>
+    </form>
+
+    <p id="message" role="status"></p>
+  </section>
+
+  <section class="panel">
+    <h3>Transaction History</h3>
+    <div id="transactionList"></div>
+  </section>
+
+</main>
+
+<script>
+const STORAGE_KEY = "aiBusinessTransactionsV1";
+
+let transactions = [];
+
+try {
+  const saved = JSON.parse(
+    localStorage.getItem(STORAGE_KEY) || "[]"
+  );
+
+  if (Array.isArray(saved)) {
+    transactions = saved.filter(item =>
+      item &&
+      typeof item.id === "string" &&
+      ["sale", "expense"].includes(item.type) &&
+      typeof item.description === "string" &&
+      Number.isFinite(item.amount) &&
+      item.amount > 0 &&
+      typeof item.date === "string"
+    );
+  }
+} catch (error) {
+  transactions = [];
+}
+
+const form = document.getElementById("transactionForm");
+const message = document.getElementById("message");
+
+function money(amount) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR"
+  }).format(amount);
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(transactions)
+    );
+    return true;
+  } catch (error) {
+    message.textContent =
+      "Could not save data. Check browser storage.";
+    return false;
+  }
+}
+
+function render() {
+  const sales = transactions
+    .filter(item => item.type === "sale")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const expenses = transactions
+    .filter(item => item.type === "expense")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  document.getElementById("salesTotal").textContent =
+    money(sales);
+
+  document.getElementById("expenseTotal").textContent =
+    money(expenses);
+
+  document.getElementById("balanceTotal").textContent =
+    money(sales - expenses);
+
+  document.getElementById("transactionCount").textContent =
+    transactions.length;
+
+  const list = document.getElementById("transactionList");
+  list.replaceChildren();
+
+  if (transactions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No transactions yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  [...transactions].reverse().forEach(item => {
+    const record = document.createElement("div");
+    record.className = "record";
+
+    const title = document.createElement("strong");
+    title.textContent = item.description;
+
+    const details = document.createElement("p");
+    details.className = "muted";
+    details.textContent =
+      `${item.type === "sale" ? "Sale" : "Expense"} • ` +
+      `${item.date} • ${money(item.amount)}`;
+
+    const remove = document.createElement("button");
+    remove.className = "danger";
+    remove.textContent = "Delete";
+
+    remove.addEventListener("click", () => {
+      if (!confirm("Delete this transaction?")) return;
+
+      const oldTransactions = transactions;
+      transactions = transactions.filter(
+        transaction => transaction.id !== item.id
+      );
+
+      if (saveData()) {
+        message.textContent = "Transaction deleted.";
+        render();
+      } else {
+        transactions = oldTransactions;
+        render();
+      }
+    });
+
+    record.append(title, details, remove);
+    list.appendChild(record);
+  });
+}
+
+form.addEventListener("submit", event => {
+  event.preventDefault();
+
+  const type = document.getElementById("type").value;
+  const description =
+    document.getElementById("description").value.trim();
+  const amount =
+    Number(document.getElementById("amount").value);
+
+  if (!description || !Number.isFinite(amount) ||
+      amount <= 0 || amount > 100000000) {
+    message.textContent = "Enter valid transaction details.";
+    return;
+  }
+
+  const transaction = {
+    id: crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`,
+    type,
+    description,
+    amount: Math.round(amount * 100) / 100,
+    date: new Date().toLocaleDateString("en-CA")
+  };
+
+  transactions.push(transaction);
+
+  if (saveData()) {
+    form.reset();
+    message.textContent = "Transaction saved successfully!";
+    render();
+  } else {
+    transactions.pop();
+    render();
+  }
+});
+
+render();
+</script>
+
+</body>
+</html>
